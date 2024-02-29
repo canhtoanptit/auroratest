@@ -1,7 +1,7 @@
 ## Account Cache Implementation
 
 ### Overview
-This repository contains an implementation of an account cache (`AccountCacheImpl`) in Java, along with associated test 
+This repository contains an implementation of an account cache (`AccountCache`) in Java, along with associated test 
 cases (`AccountCacheTest`). The account cache is designed to store account information and provide methods for accessing and updating accounts.
 
 ### Account Cache Implementation (`AccountCacheImpl`)
@@ -16,7 +16,7 @@ To run the test cases for the `AccountCacheImpl` class, follow these steps:
 
 1. Clone this repository to your local machine.
 2. Open the project in your preferred Java development environment.
-3. Navigate to the `src/test/java/aurora` directory.
+3. Navigate to the `src/test/java/org/example/aurora` directory.
 4. Open the `AccountCacheTest.java` file.
 5. Run the test cases using your IDE's test runner or by executing the Maven command `mvn test`.
 
