@@ -3,15 +3,16 @@ package org.example.aurora;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Random;
 import java.util.concurrent.*;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Consumer;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.awaitility.Awaitility.await;
+import static org.example.aurora.AccountTestHelper.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.Mockito.mock;
@@ -24,7 +25,6 @@ public class AccountCacheTest {
     private AccountCacheExtendForTest accountCache;
     private Consumer<Account> accountListenerMock;
     private Random random;
-    private final Lock printLock = new ReentrantLock();
     private final ReentrantReadWriteLock updateLock = new ReentrantReadWriteLock();
 
     @BeforeEach
@@ -36,7 +36,7 @@ public class AccountCacheTest {
     }
 
     @Test
-    void testUpdateExistingAccount() {
+    void GivenExistingAccount_WhenUpdateAccount_ThenReturnAccountWithListener() {
         Account account1 = new Account(1, 1000);
         accountCache.putAccount(account1);
         await().atMost(1, SECONDS).until(() -> {
@@ -55,19 +55,19 @@ public class AccountCacheTest {
     }
 
     @Test
-    void testGetAccountById() {
+    void GivenAccountID_WhenGetAccountByID_ThenReturnAccount() {
         Account account = new Account(1, 1000);
         accountCache.putAccount(account);
         assertEquals(account, accountCache.getAccountById(1));
     }
 
     @Test
-    void testGetNonExistentAccountById() {
+    void GivenEmptyCache_WhenGetNonExistentAccountById_ThenReturnNull() {
         assertNull(accountCache.getAccountById(999));
     }
 
     @Test
-    void testGetTop3AccountsByBalanceLessThan3() {
+    void Given2AccountsToCacheWhenGetTop3AccountsByBalanceLessThan3() {
         Account account1 = new Account(1, 1000);
         Account account2 = new Account(2, 2000);
         accountCache.putAccount(account1);
@@ -77,7 +77,7 @@ public class AccountCacheTest {
     }
 
     @Test
-    void testGetTop3AccountsByBalanceGreaterThan3() {
+    void Given5AccountToCache_WhenGetTop3AccountsByBalance_ThenReturn3AccountOrderByBalance() {
         Account account1 = new Account(1, 1000);
         Account account2 = new Account(2, 2000);
         Account account3 = new Account(3, 3000);
@@ -93,12 +93,12 @@ public class AccountCacheTest {
     }
 
     @Test
-    public void testGetTop3AccountsByBalanceWithNoAccounts() {
+    public void GivenEmptyCache_WhenGetTop3AccountsByBalance_ThenReturnEmptyList() {
         assertEquals(0, accountCache.getTop3AccountsByBalance().size());
     }
 
     @Test
-    public void testGetAccountByIdHitCountWithAccess() {
+    public void GivenCacheWithAccountHasHit_WhenGetAccountByIdHitCount_ThenReturnTotalHitCount() {
         Account account = new Account(1, 1000);
         accountCache.putAccount(account);
         for (int i = 1; i <= 100; i++) {
@@ -108,20 +108,20 @@ public class AccountCacheTest {
     }
 
     @Test
-    public void testGetAccountByIdHitCountWithNoAccess() {
+    public void GivenCacheWithAccountDoesNotHit_WhenGetAccountByIdHitCount_ThenReturnZero() {
         Account account = new Account(1, 1000);
         accountCache.putAccount(account);
         assertEquals(0, accountCache.getAccountByIdHitCount());
     }
 
     @Test
-    public void testManyPutAndGet() {
+    public void GivenCache_WhenRandomPutAndGet_ThenReturnCorrespondingAccount() {
         for (int i = 0; i < 100; i++) {
-            Account account = new Account(i, this.generateRandomBalance());
+            Account account = new Account(i, generateRandomBalance());
             accountCache.putAccount(account);
             if (i > 0) {
                 accountCache.getAccountById(random.nextInt(i));
-                Account accountUpdate = new Account(random.nextInt(i), this.generateRandomBalance());
+                Account accountUpdate = new Account(random.nextInt(i), generateRandomBalance());
                 accountCache.putAccount(accountUpdate);
             }
             assertTop3AccountsAreCorrect(
@@ -132,24 +132,10 @@ public class AccountCacheTest {
         }
     }
 
-    static class Result {
-        int taskId;
-        long time;
-        List<Account> actualTop3Accounts;
-        List<Account> allAccounts;
-
-        public Result(int taskId, long time, List<Account> actualTop3Accounts, List<Account> allAccounts) {
-            this.taskId = taskId;
-            this.time = time;
-            this.actualTop3Accounts = actualTop3Accounts;
-            this.allAccounts = allAccounts;
-        }
-    }
-
     @Test
-    public void testzMultiThreadedPutAndGet() throws InterruptedException {
+    public void GivenAccountCache_WhenMultiThreadedPutAndGet_ThenReturnCorrespondingResult() throws InterruptedException {
         ExecutorService executor = Executors.newFixedThreadPool(50);
-        List<Callable<Result>> tasks = new ArrayList<>();
+        List<Callable<AccountTestHelper.Result>> tasks = new ArrayList<>();
         for (int i = 0; i < 1000; i++) {
             Callable<Result> task = getResultCallable(i);
             tasks.add(task);
@@ -176,15 +162,15 @@ public class AccountCacheTest {
         }
     }
 
-    private Callable<Result> getResultCallable(int i) {
+    private Callable<AccountTestHelper.Result> getResultCallable(int i) {
         return () -> {
-            Account account = new Account(i, this.generateRandomBalance());
+            Account account = new Account(i, generateRandomBalance());
             updateLock.writeLock().lock();
             try {
                 accountCache.putAccount(account);
                 if (i > 0) {
                     accountCache.getAccountById(random.nextInt(i));
-                    Account accountUpdate = new Account(random.nextInt(i), this.generateRandomBalance());
+                    Account accountUpdate = new Account(random.nextInt(i), generateRandomBalance());
                     accountCache.putAccount(accountUpdate);
                 }
             } finally {
@@ -202,40 +188,5 @@ public class AccountCacheTest {
             }
             return new Result(i, System.currentTimeMillis(), actualTop3Accounts, allAccounts);
         };
-    }
-
-    private int generateRandomBalance() {
-        return random.nextInt(999001) + 1000;
-    }
-
-    private void printTop3Accounts(List<Account> expectedTop3Accounts, List<Account> actualTop3Accounts) {
-        printLock.lock();
-        try {
-            System.out.println("Expected Top 3 Accounts:");
-            for (Account entry : expectedTop3Accounts) {
-                System.out.println("ID: " + entry.id + ", Balance: " + entry.getBalance());
-            }
-
-            System.out.println("Actual Top 3 Accounts:");
-            for (Account account : actualTop3Accounts) {
-                System.out.println("ID: " + account.id + ", Balance: " + account.getBalance());
-            }
-        } finally {
-            printLock.unlock();
-        }
-    }
-
-    private void assertTop3AccountsAreCorrect(List<Account> actualTop3Accounts, List<Account> allAccounts) {
-        List<Account> expectedTop3Accounts = getExpectedTop3Accounts(allAccounts);
-        printTop3Accounts(expectedTop3Accounts, actualTop3Accounts);
-        assertEquals(expectedTop3Accounts.size(), actualTop3Accounts.size());
-        for (int i = 0; i < expectedTop3Accounts.size(); i++) {
-            assertEquals(expectedTop3Accounts.get(i), actualTop3Accounts.get(i));
-        }
-    }
-
-    private List<Account> getExpectedTop3Accounts(List<Account> allAccounts) {
-        allAccounts.sort(Comparator.comparingLong(Account::getBalance).reversed());
-        return allAccounts.subList(0, Math.min(3, allAccounts.size()));
     }
 }
