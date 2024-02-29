@@ -67,7 +67,7 @@ public class AccountCacheTest {
     }
 
     @Test
-    void Given2AccountsToCacheWhenGetTop3AccountsByBalanceLessThan3() {
+    void Given2AccountsToCache_WhenGetTop3AccountsByBalance_ThenReturn2Accounts() {
         Account account1 = new Account(1, 1000);
         Account account2 = new Account(2, 2000);
         accountCache.putAccount(account1);
