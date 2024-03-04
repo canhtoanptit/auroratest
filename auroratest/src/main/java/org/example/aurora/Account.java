@@ -6,8 +6,8 @@ import java.util.Objects;
  * Represents an account with an ID and a balance.
  */
 public class Account {
-    public long id;
-    public long balance;
+    private final long id;
+    private final long balance;
 
     /**
      * Constructs an Account object with the given ID and balance.
