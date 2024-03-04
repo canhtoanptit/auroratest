@@ -9,11 +9,11 @@ public class AccountCacheExtendForTest extends AccountCacheImpl {
     }
 
     public Collection<Account> getAllAccounts() {
-        lock.readLock().lock();
+        long stamp = lock.readLock();
         try {
             return this.cacheMap.values();
         } finally {
-            this.lock.readLock().unlock();
+            this.lock.unlockRead(stamp);
         }
     }
 }

@@ -1,10 +1,13 @@
 package org.example.aurora;
 
-import java.util.*;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.concurrent.locks.StampedLock;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
@@ -14,7 +17,7 @@ import java.util.stream.Collectors;
 public class AccountCacheImpl implements AccountCache {
     protected final Map<Long, Account> cacheMap;
     private final CopyOnWriteArrayList<Consumer<Account>> accountListeners = new CopyOnWriteArrayList<>();
-    protected final ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
+    protected final StampedLock lock = new StampedLock();
     private final ExecutorService listenerThreadPool = Executors.
             newFixedThreadPool(Runtime.getRuntime().availableProcessors());
 
@@ -32,66 +35,63 @@ public class AccountCacheImpl implements AccountCache {
 
     @Override
     public Account getAccountById(long id) {
-        lock.writeLock().lock();
+        long stamp = lock.writeLock();
         try {
             Account account = cacheMap.get(id);
             if (account == null) {
                 return null;
             }
             this.countGetByIdHit++;
-            return new Account(account.id, account.getBalance());
+            return account;
         } finally {
-            lock.writeLock().unlock();
+            lock.unlockWrite(stamp);
         }
     }
 
     @Override
     public void subscribeForAccountUpdates(Consumer<Account> listener) {
-        lock.writeLock().lock();
+        long stamp = lock.writeLock();
         try {
             this.accountListeners.add(listener);
         } finally {
-            lock.writeLock().unlock();
+            lock.unlockWrite(stamp);
         }
     }
 
     @Override
     public List<Account> getTop3AccountsByBalance() {
-        lock.readLock().lock();
+        long stamp = lock.readLock();
         try {
             return cacheMap.values().stream()
                     .sorted(Comparator.comparingLong(Account::getBalance).reversed())
                     .limit(3)
-                    .map(acc -> new Account(acc.getId(), acc.getBalance()))
                     .collect(Collectors.toList());
         } finally {
-            lock.readLock().unlock();
+            lock.unlockRead(stamp);
         }
     }
 
     @Override
     public int getAccountByIdHitCount() {
-        lock.readLock().lock();
+        long stamp = lock.readLock();
         try {
             return this.countGetByIdHit;
         } finally {
-            lock.readLock().unlock();
+            lock.unlockRead(stamp);
         }
     }
 
     @Override
     public void putAccount(Account account) {
-        lock.writeLock().lock();
+        long stamp = lock.writeLock();
         try {
-            Account accountCopy = new Account(account.id, account.getBalance());
-            cacheMap.put(accountCopy.id, accountCopy);
+            cacheMap.put(account.getId(), account);
         } finally {
-            lock.writeLock().unlock();
+            lock.unlockWrite(stamp);
         }
         for (Consumer<Account> listener : this.accountListeners) {
             if (listener != null) {
-                Account accountForSubscribe = new Account(account.id, account.getBalance());
-                this.listenerThreadPool.execute(() -> listener.accept(accountForSubscribe));
+                this.listenerThreadPool.execute(() -> listener.accept(account));
             }
         }
     }

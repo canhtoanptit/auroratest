@@ -1,8 +1,6 @@
 package org.example.aurora;
 
-import java.util.Comparator;
-import java.util.List;
-import java.util.Random;
+import java.util.*;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -33,16 +31,17 @@ public class AccountTestHelper {
     }
 
     public static void printTop3Accounts(List<Account> expectedTop3Accounts, List<Account> actualTop3Accounts) {
+        Collections.synchronizedMap(HashMap.newHashMap(1));
         printLock.lock();
         try {
             System.out.println("Expected Top 3 Accounts:");
             for (Account entry : expectedTop3Accounts) {
-                System.out.println("ID: " + entry.id + ", Balance: " + entry.getBalance());
+                System.out.println("ID: " + entry.getId() + ", Balance: " + entry.getBalance());
             }
 
             System.out.println("Actual Top 3 Accounts:");
             for (Account account : actualTop3Accounts) {
-                System.out.println("ID: " + account.id + ", Balance: " + account.getBalance());
+                System.out.println("ID: " + account.getId() + ", Balance: " + account.getBalance());
             }
         } finally {
             printLock.unlock();
