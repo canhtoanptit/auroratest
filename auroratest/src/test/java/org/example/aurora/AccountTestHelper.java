@@ -36,12 +36,12 @@ public class AccountTestHelper {
         try {
             System.out.println("Expected Top 3 Accounts:");
             for (Account entry : expectedTop3Accounts) {
-                System.out.println("ID: " + entry.getId() + ", Balance: " + entry.getBalance());
+                System.out.println("ID: " + entry.id() + ", Balance: " + entry.balance());
             }
 
             System.out.println("Actual Top 3 Accounts:");
             for (Account account : actualTop3Accounts) {
-                System.out.println("ID: " + account.getId() + ", Balance: " + account.getBalance());
+                System.out.println("ID: " + account.id() + ", Balance: " + account.balance());
             }
         } finally {
             printLock.unlock();
@@ -58,7 +58,7 @@ public class AccountTestHelper {
     }
 
     private static List<Account> getExpectedTop3Accounts(List<Account> allAccounts) {
-        allAccounts.sort(Comparator.comparingLong(Account::getBalance).reversed());
+        allAccounts.sort(Comparator.comparingLong(Account::balance).reversed());
         return allAccounts.subList(0, Math.min(3, allAccounts.size()));
     }
 }

@@ -35,6 +35,9 @@ public class AccountCacheImpl implements AccountCache {
 
     @Override
     public Account getAccountById(long id) {
+        /*
+         * we can use less expensive lock with read lock and atomic integer for counter as wel
+         */
         long stamp = lock.writeLock();
         try {
             Account account = cacheMap.get(id);
@@ -58,7 +61,7 @@ public class AccountCacheImpl implements AccountCache {
         long stamp = lock.readLock();
         try {
             return cacheMap.values().stream()
-                    .sorted(Comparator.comparingLong(Account::getBalance).reversed())
+                    .sorted(Comparator.comparingLong(Account::balance).reversed())
                     .limit(3)
                     .collect(Collectors.toList());
         } finally {
@@ -68,6 +71,7 @@ public class AccountCacheImpl implements AccountCache {
 
     @Override
     public int getAccountByIdHitCount() {
+        // can use atomic integer for count git
         long stamp = lock.readLock();
         try {
             return this.countGetByIdHit;
@@ -80,7 +84,7 @@ public class AccountCacheImpl implements AccountCache {
     public void putAccount(Account account) {
         long stamp = lock.writeLock();
         try {
-            cacheMap.put(account.getId(), account);
+            cacheMap.put(account.id(), account);
         } finally {
             lock.unlockWrite(stamp);
         }
