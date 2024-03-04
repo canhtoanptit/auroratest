@@ -50,12 +50,7 @@ public class AccountCacheImpl implements AccountCache {
 
     @Override
     public void subscribeForAccountUpdates(Consumer<Account> listener) {
-        long stamp = lock.writeLock();
-        try {
-            this.accountListeners.add(listener);
-        } finally {
-            lock.unlockWrite(stamp);
-        }
+        this.accountListeners.add(listener);
     }
 
     @Override
