@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.StampedLock;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
@@ -22,7 +23,7 @@ public class AccountCacheImpl implements AccountCache {
             newFixedThreadPool(Runtime.getRuntime().availableProcessors());
 
     private final int capacity;
-    private int countGetByIdHit;
+    private final AtomicInteger countGetByIdHit = new AtomicInteger();
 
     public AccountCacheImpl(int capacity) {
         this.capacity = capacity;
@@ -38,16 +39,16 @@ public class AccountCacheImpl implements AccountCache {
         /*
          * we can use less expensive lock with read lock and atomic integer for counter as wel
          */
-        long stamp = lock.writeLock();
+        long stamp = lock.readLock();
         try {
             Account account = cacheMap.get(id);
             if (account == null) {
                 return null;
             }
-            this.countGetByIdHit++;
+            this.countGetByIdHit.incrementAndGet();
             return account;
         } finally {
-            lock.unlockWrite(stamp);
+            lock.unlockRead(stamp);
         }
     }
 
@@ -72,12 +73,7 @@ public class AccountCacheImpl implements AccountCache {
     @Override
     public int getAccountByIdHitCount() {
         // can use atomic integer for count git
-        long stamp = lock.readLock();
-        try {
-            return this.countGetByIdHit;
-        } finally {
-            lock.unlockRead(stamp);
-        }
+        return this.countGetByIdHit.get();
     }
 
     @Override
