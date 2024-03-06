@@ -24,7 +24,7 @@ import static org.mockito.Mockito.verify;
 public class AccountCacheTest {
     private AccountCacheExtendForTest accountCache;
     private Consumer<Account> accountListenerMock;
-    private Random random;
+    private Random random = new Random();
     private final ReentrantReadWriteLock updateLock = new ReentrantReadWriteLock();
 
     @BeforeEach
@@ -32,7 +32,6 @@ public class AccountCacheTest {
         accountCache = new AccountCacheExtendForTest(5);
         accountListenerMock = mock(Consumer.class);
         accountCache.subscribeForAccountUpdates(accountListenerMock);
-        random = new Random();
     }
 
     @Test
@@ -126,7 +125,7 @@ public class AccountCacheTest {
             }
             assertTop3AccountsAreCorrect(
                     accountCache.getTop3AccountsByBalance(),
-                    new ArrayList<Account>(this.accountCache.getAllAccounts())
+                    new ArrayList<>(this.accountCache.getAllAccounts())
             );
             assertEquals(account, accountCache.getAccountById(i));
         }
