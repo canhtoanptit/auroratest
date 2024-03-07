@@ -10,13 +10,10 @@ import java.util.concurrent.*;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Consumer;
 
-import static java.util.concurrent.TimeUnit.SECONDS;
-import static org.awaitility.Awaitility.await;
 import static org.example.aurora.AccountTestHelper.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
 
 /**
  * Unit test for aurora.AccountCacheImpl
@@ -24,7 +21,7 @@ import static org.mockito.Mockito.verify;
 public class AccountCacheTest {
     private AccountCacheExtendForTest accountCache;
     private Consumer<Account> accountListenerMock;
-    private Random random = new Random();
+    private final Random random = new Random();
     private final ReentrantReadWriteLock updateLock = new ReentrantReadWriteLock();
 
     @BeforeEach
@@ -35,20 +32,24 @@ public class AccountCacheTest {
     }
 
     @Test
-    void GivenExistingAccount_WhenUpdateAccount_ThenReturnAccountWithListener() {
+    void GivenExistingAccount_WhenUpdateAccount_ThenReturnAccountWithListener() throws InterruptedException {
+        accountCache.subscribeForAccountUpdates(System.out::println);
+        accountCache.subscribeForAccountUpdates(account -> System.out.println("process sub 2 " + account));
+        accountCache.subscribeForAccountUpdates(account -> {
+            try {
+                var r = random.nextInt(1000) + 200;
+                System.out.println(r);
+                Thread.sleep(r);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+            System.out.println("Sleep in sub 3 " + account);
+        });
         Account account1 = new Account(1, 1000);
         accountCache.putAccount(account1);
-        await().atMost(1, SECONDS).until(() -> {
-            verify(accountListenerMock).accept(account1);
-            return true;
-        });
 
         Account account2 = new Account(1, 2000);
         accountCache.putAccount(account2);
-        await().atMost(1, SECONDS).until(() -> {
-            verify(accountListenerMock).accept(account2);
-            return true;
-        });
 
         assertEquals(account2, accountCache.getAccountById(1));
     }

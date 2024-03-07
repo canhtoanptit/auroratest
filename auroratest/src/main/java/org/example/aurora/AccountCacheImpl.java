@@ -1,12 +1,7 @@
 package org.example.aurora;
 
-import java.util.Comparator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.*;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.StampedLock;
 import java.util.function.Consumer;
@@ -19,11 +14,11 @@ public class AccountCacheImpl implements AccountCache {
     protected final Map<Long, Account> cacheMap;
     private final CopyOnWriteArrayList<Consumer<Account>> accountListeners = new CopyOnWriteArrayList<>();
     protected final StampedLock lock = new StampedLock();
-    private final ExecutorService listenerThreadPool = Executors.
-            newFixedThreadPool(Runtime.getRuntime().availableProcessors());
 
     private final int capacity;
     private final AtomicInteger countGetByIdHit = new AtomicInteger();
+
+    ExecutorService service = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
 
     public AccountCacheImpl(int capacity) {
         this.capacity = capacity;
@@ -84,10 +79,12 @@ public class AccountCacheImpl implements AccountCache {
         } finally {
             lock.unlockWrite(stamp);
         }
-        for (Consumer<Account> listener : this.accountListeners) {
-            if (listener != null) {
-                this.listenerThreadPool.execute(() -> listener.accept(account));
-            }
-        }
+        List<CompletableFuture<Void>> futures =
+                accountListeners.stream()
+                        .map(
+                                listener ->
+                                        CompletableFuture.runAsync(() -> listener.accept(account), service))
+                        .toList();
+        CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
     }
 }
