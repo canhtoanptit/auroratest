@@ -76,15 +76,15 @@ public class AccountCacheImpl implements AccountCache {
         long stamp = lock.writeLock();
         try {
             cacheMap.put(account.id(), account);
+            List<CompletableFuture<Void>> futures =
+                    accountListeners.stream()
+                            .map(
+                                    listener ->
+                                            CompletableFuture.runAsync(() -> listener.accept(account), service))
+                            .toList();
+            CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
         } finally {
             lock.unlockWrite(stamp);
         }
-        List<CompletableFuture<Void>> futures =
-                accountListeners.stream()
-                        .map(
-                                listener ->
-                                        CompletableFuture.runAsync(() -> listener.accept(account), service))
-                        .toList();
-        CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
     }
 }

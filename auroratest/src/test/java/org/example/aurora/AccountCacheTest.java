@@ -32,7 +32,7 @@ public class AccountCacheTest {
     }
 
     @Test
-    void GivenExistingAccount_WhenUpdateAccount_ThenReturnAccountWithListener() throws InterruptedException {
+    void GivenExistingAccount_WhenUpdateAccount_ThenReturnAccountWithListener() {
         accountCache.subscribeForAccountUpdates(System.out::println);
         accountCache.subscribeForAccountUpdates(account -> System.out.println("process sub 2 " + account));
         accountCache.subscribeForAccountUpdates(account -> {
@@ -160,6 +160,36 @@ public class AccountCacheTest {
                 }
             }
         }
+    }
+
+    @Test
+    void GivenExistingAccount_WhenMultiThreadUpdateAccount_ThenReturnAccount() throws InterruptedException {
+        accountCache.subscribeForAccountUpdates(System.out::println);
+        accountCache.subscribeForAccountUpdates(account -> System.out.println("process sub 2 " + account));
+        accountCache.subscribeForAccountUpdates(account -> {
+            try {
+                var r = random.nextInt(1000) + 200;
+                System.out.println(r);
+                Thread.sleep(r);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+            System.out.println("Sleep in sub 3 " + account);
+        });
+        CountDownLatch countDownLatch = new CountDownLatch(2);
+        new Thread(() -> {
+            Account account1 = new Account(1, 1000);
+            accountCache.putAccount(account1);
+            countDownLatch.countDown();
+        }).start();
+
+        new Thread(() -> {
+            Account account2 = new Account(1, 2000);
+            accountCache.putAccount(account2);
+            assertEquals(account2, accountCache.getAccountById(1));
+            countDownLatch.countDown();
+        }).start();
+        countDownLatch.await();
     }
 
     private Callable<AccountTestHelper.Result> getResultCallable(int i) {
