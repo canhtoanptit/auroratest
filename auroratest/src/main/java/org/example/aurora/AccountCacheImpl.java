@@ -1,7 +1,9 @@
 package org.example.aurora;
 
-import java.util.*;
-import java.util.concurrent.*;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.StampedLock;
 import java.util.function.Consumer;
@@ -12,13 +14,11 @@ import java.util.stream.Collectors;
  */
 public class AccountCacheImpl implements AccountCache {
     protected final Map<Long, Account> cacheMap;
-    private final CopyOnWriteArrayList<Consumer<Account>> accountListeners = new CopyOnWriteArrayList<>();
     protected final StampedLock lock = new StampedLock();
-
     private final int capacity;
     private final AtomicInteger countGetByIdHit = new AtomicInteger();
 
-    ExecutorService service = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
+    private final AccountNotification accountNotification;
 
     public AccountCacheImpl(int capacity) {
         this.capacity = capacity;
@@ -27,6 +27,7 @@ public class AccountCacheImpl implements AccountCache {
                 return size() > AccountCacheImpl.this.capacity;
             }
         };
+        this.accountNotification = new AccountNotification();
     }
 
     @Override
@@ -49,7 +50,7 @@ public class AccountCacheImpl implements AccountCache {
 
     @Override
     public void subscribeForAccountUpdates(Consumer<Account> listener) {
-        this.accountListeners.add(listener);
+        this.accountNotification.addListener(listener);
     }
 
     @Override
@@ -76,15 +77,9 @@ public class AccountCacheImpl implements AccountCache {
         long stamp = lock.writeLock();
         try {
             cacheMap.put(account.id(), account);
-            List<CompletableFuture<Void>> futures =
-                    accountListeners.stream()
-                            .map(
-                                    listener ->
-                                            CompletableFuture.runAsync(() -> listener.accept(account), service))
-                            .toList();
-            CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
         } finally {
             lock.unlockWrite(stamp);
         }
+        this.accountNotification.notify(account);
     }
 }
