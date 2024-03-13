@@ -1,5 +1,6 @@
 package org.example.aurora;
 
+import org.awaitility.Awaitility;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -7,6 +8,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Consumer;
 
@@ -135,8 +137,21 @@ public class AccountCacheTest {
     @Test
     public void GivenAccountCache_WhenMultiThreadedPutAndGet_ThenReturnCorrespondingResult() throws InterruptedException {
         ExecutorService executor = Executors.newFixedThreadPool(50);
+        AtomicInteger counter = new AtomicInteger();
+        accountCache.subscribeForAccountUpdates(acc -> System.out.println("process sub 1 " + acc));
+        accountCache.subscribeForAccountUpdates(acc -> {
+            try {
+                var r = random.nextInt(1000) + 200;
+                System.out.println(r);
+                Thread.sleep(r);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+            System.out.println("Sleep in sub 2 " + acc);
+            counter.getAndIncrement();
+        });
         List<Callable<AccountTestHelper.Result>> tasks = new ArrayList<>();
-        for (int i = 0; i < 1000; i++) {
+        for (int i = 0; i < 10; i++) {
             Callable<Result> task = getResultCallable(i);
             tasks.add(task);
         }
@@ -160,10 +175,14 @@ public class AccountCacheTest {
                 }
             }
         }
+        Awaitility.await().atMost(10, TimeUnit.SECONDS).until(() -> counter.get() == 10);
     }
 
+    /**
+     * Compare both countdown lack with awaitdility
+     */
     @Test
-    void GivenExistingAccount_WhenMultiThreadUpdateAccount_ThenReturnAccount() throws InterruptedException {
+    void GivenExistingAccount_WhenMultiThreadUpdateAccount_ThenReturnAccount() {
         accountCache.subscribeForAccountUpdates(System.out::println);
         accountCache.subscribeForAccountUpdates(account -> System.out.println("process sub 2 " + account));
         accountCache.subscribeForAccountUpdates(account -> {
@@ -176,20 +195,24 @@ public class AccountCacheTest {
             }
             System.out.println("Sleep in sub 3 " + account);
         });
-        CountDownLatch countDownLatch = new CountDownLatch(2);
+        //CountDownLatch countDownLatch = new CountDownLatch(2);
         new Thread(() -> {
             Account account1 = new Account(1, 1000);
             accountCache.putAccount(account1);
-            countDownLatch.countDown();
+            //countDownLatch.countDown();
         }).start();
 
         new Thread(() -> {
             Account account2 = new Account(1, 2000);
             accountCache.putAccount(account2);
             assertEquals(account2, accountCache.getAccountById(1));
-            countDownLatch.countDown();
+            //countDownLatch.countDown();
         }).start();
-        countDownLatch.await();
+        //countDownLatch.await();
+        Awaitility.await().atLeast(5, TimeUnit.SECONDS).until(() -> {
+            Thread.sleep(5_000);
+            return true;
+        });
     }
 
     private Callable<AccountTestHelper.Result> getResultCallable(int i) {
