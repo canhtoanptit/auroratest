@@ -1,9 +1,7 @@
 package org.example.aurora;
 
-import java.util.Comparator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.StampedLock;
 import java.util.function.Consumer;
@@ -19,6 +17,10 @@ public class AccountCacheImpl implements AccountCache {
     private final AtomicInteger countGetByIdHit = new AtomicInteger();
 
     private final AccountNotification accountNotification;
+
+    private List<Account> top3Account = new ArrayList<>();
+
+    private final AtomicBoolean hasUpdateAccount = new AtomicBoolean();
 
     public AccountCacheImpl(int capacity) {
         this.capacity = capacity;
@@ -57,10 +59,14 @@ public class AccountCacheImpl implements AccountCache {
     public List<Account> getTop3AccountsByBalance() {
         long stamp = lock.readLock();
         try {
-            return cacheMap.values().stream()
+            if (!hasUpdateAccount.get()) {
+                return this.top3Account;
+            }
+            this.top3Account = cacheMap.values().stream()
                     .sorted(Comparator.comparingLong(Account::balance).reversed())
                     .limit(3)
                     .collect(Collectors.toList());
+            return this.top3Account;
         } finally {
             lock.unlockRead(stamp);
         }
@@ -76,10 +82,12 @@ public class AccountCacheImpl implements AccountCache {
     public void putAccount(Account account) {
         long stamp = lock.writeLock();
         try {
+            // check if new account does not effected to top 3
             cacheMap.put(account.id(), account);
         } finally {
             lock.unlockWrite(stamp);
         }
+        hasUpdateAccount.set(true);
         this.accountNotification.notify(account);
     }
 }
